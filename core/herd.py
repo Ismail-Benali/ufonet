@@ -62,15 +62,24 @@ class Herd(object):
                 self.result[zombie]=str(result)
                 self.connection[zombie]=connection_failed
                 self.done.append(zombie)
-                if result[0]==200 :
+                # Handle both string and list/tuple result formats
+                result_code = result[0] if isinstance(result, (list, tuple)) else result.split(' ')[0] if isinstance(result, str) else '0'
+                if result_code == 200:
                     self.total_hits+=1
                 else:
                     self.total_fails+=1
                 if connection_failed:
                     self.total_connection_fails+=1
                 self.active.remove(zombie)
-                self.total_time+=result[1]
-                self.total_size+=result[2]
+                # Handle result format for time and size
+                if isinstance(result, (list, tuple)):
+                    self.total_time+=result[1]
+                    self.total_size+=result[2]
+                elif isinstance(result, str):
+                    parts = result.split('|')
+                    if len(parts) >= 3:
+                        self.total_time+=int(parts[1]) if parts[1].isdigit() else 0
+                        self.total_size+=int(parts[2]) if parts[2].isdigit() else 0
                 if zombie in self.stats:
                     self.stats[zombie].append(result)
                 else:
@@ -217,7 +226,14 @@ class Herd(object):
             if len(zs)==0:
                 continue
             for line in zs:
-                if line[0]==200:
+                # Handle both string and tuple/list format
+                if isinstance(line, (list, tuple)):
+                    code = line[0]
+                elif isinstance(line, str):
+                    code = line.split(' ')[0] if line.split(' ') else '0'
+                else:
+                    code = '0'
+                if code == 200:
                     entry['hits']+=1
                 else:
                     entry['fails']+=1

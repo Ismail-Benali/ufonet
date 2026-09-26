@@ -1,5 +1,5 @@
-#!/usr/bin/env python3 
-# -*- coding: utf-8 -*-"
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 This file is part of the UFONet project, https://ufonet.03c8.net
 
@@ -12,6 +12,7 @@ Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 from threading import Thread
 import socket, time, os, base64, re
 from urllib.parse import urlparse
+import datetime
 class Needle(Thread):
     def __init__(self, client, addr, parent):
         Thread.__init__(self)
@@ -24,11 +25,12 @@ class Needle(Thread):
         if data:
             if data.startswith("HEAD"):
                 self.parent.data_arrived(data)
+                current_date = datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT")
                 self.client.send("""HTTP/1.1 200 OK
 Server: UFONet Galactic Cyber Warfare
-Date: Wed, 05 Nov 2042 16:21:23 GMT
+Date: """ + current_date + """
 Content-Type: text/html
-Content-Length: """+str(len('thanks for coming!'))+"""
+Content-Length: """ + str(len('thanks for coming!')) + """
 Connection: close
 
 """)
@@ -39,9 +41,16 @@ Connection: close
                 self.client.send('='*40)
                 self.client.send("\n\nStream:\n")
                 self.client.send('-'*15 + "\n\n")
-                f = open("mothership", 'r') # read mothership stream
-                self.client.send(str(f.read()))
-                f.close()
+                try:
+                    f = open("mothership", 'r') # read mothership stream
+                    content = f.read()
+                    if isinstance(content, bytes):
+                        self.client.send(content)
+                    else:
+                        self.client.send(str(content).encode('utf-8'))
+                    f.close()
+                except FileNotFoundError:
+                    self.client.send(b"Mothership stream not found.")
                 self.client.close()
         self.parent.client_finished(self)
 
@@ -52,24 +61,24 @@ class Doll(Thread):
         self._clients = []
         self._armed = True
         self.ready = False
-        self.running =False
+        self.running = False
         self.parent = parent
         self.real_zombies = [] # 100% vulnerable zombies
         if os.path.exists('mothership') == True:
-            os.remove('mothership') # remove mothership stream 
+            os.remove('mothership') # remove mothership stream
         with open('alien') as f: # call alien to verify vulnerability
             self.alien = f.read().splitlines()
         f.close()
 
     def data_arrived(self, data):
-        data.split("\n")[0]
+        first_line = data.split("\n")[0]
         self.check_zombie(data)
         f = open("mothership", 'a') # append data mothership stream
         f.write(data)
         f.close()
 
     def check_zombie(self, data): # check for requests received by a zombie
-        if str(''.join(self.alien)) in data: # hash check
+        if ''.join(self.alien) in data: # hash check
             if "%7C" in data: # %7C -> |
                 regex_zmb = re.compile('{}(.*){}'.format(re.escape('%7C'), re.escape(' HTTP'))) # regex magics
             else:

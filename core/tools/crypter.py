@@ -1,5 +1,5 @@
-#!/usr/bin/env python3 
-# -*- coding: utf-8 -*-"
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 This file is part of the UFONet project, https://ufonet.03c8.net
 
@@ -13,29 +13,18 @@ Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # Code extracted from project: AnonTwi (anontwi.03c8.net)
 ###################################################################
 
-KEY_SIZE = 32
-BLOCK_SIZE = 16
-MAC_SIZE = 20
-
 import base64
 from os import urandom
+import hmac as hmac_module
 from hashlib import sha1, sha256
 from Cryptodome.Cipher import AES
 
-trans_5C = ''.join([chr (x ^ 0x5c) for x in range(256)])
-trans_36 = ''.join([chr (x ^ 0x36) for x in range(256)])
-trans_5C = trans_5C.encode("latin-1")
-trans_36 = trans_36.encode("latin-1")
-
 def hmac_sha1(key, msg):
-    if len(key) > 20:
-        key = sha1(key).digest()
-    key += chr(0).encode('utf-8') * (20 - len(key))
-    o_key_pad = key.translate(trans_5C)
-    i_key_pad = key.translate(trans_36)
-    return sha1(o_key_pad + sha1(i_key_pad + msg).digest()).digest()
+    """Use Python's standard hmac module for reliability."""
+    return hmac_module.new(key, msg, sha1).digest()
 
 def derive_keys(key):
+    """Derive cipher and MAC keys using SHA256 KDF."""
     h = sha256()
     h.update(key)
     h.update('cipher'.encode('utf-8'))
@@ -47,7 +36,7 @@ def derive_keys(key):
     return (cipher_key, mac_key)
 
 def generate_key():
-    return base64.b64encode(urandom(KEY_SIZE))
+    return base64.b64encode(urandom(32))
 
 class Cipher(object):
     def __init__(self, key="", text=""):
@@ -70,10 +59,10 @@ class Cipher(object):
         return self.text
 
     def encrypt(self):
-        if BLOCK_SIZE + len(self.text) + MAC_SIZE > 105:
-            self.text = self.text[:105 - BLOCK_SIZE - MAC_SIZE]
+        if self.block_size + len(self.text) + self.mac_size > 105:
+            self.text = self.text[:105 - self.block_size - self.mac_size]
         (cipher_key, mac_key) = derive_keys(self.key)
-        iv = urandom(BLOCK_SIZE)
+        iv = urandom(self.block_size)
         aes = AES.new(cipher_key, self.mode, iv)
         ciphertext = aes.encrypt(self.text)
         mac = hmac_sha1(mac_key, iv + ciphertext)
@@ -81,7 +70,7 @@ class Cipher(object):
 
     def decrypt(self):
         try:
-            iv_ciphertext_mac = base64.urlsafe_b64decode(self.text)
+            iv_ciphertext_mac = base64.b64decode(self.text)
         except:
             try:
                 padding = len(self.text) % 4
@@ -91,12 +80,12 @@ class Cipher(object):
                     self.text += b'=='
                 elif padding == 3:
                     self.text += b'='
-                iv_ciphertext_mac = base64.urlsafe_b64decode(self.text)
+                iv_ciphertext_mac = base64.b64decode(self.text)
             except TypeError:
                 return None
-        iv = iv_ciphertext_mac[:BLOCK_SIZE]
-        ciphertext = iv_ciphertext_mac[BLOCK_SIZE:-MAC_SIZE]
-        mac = iv_ciphertext_mac[-MAC_SIZE:]
+        iv = iv_ciphertext_mac[:self.block_size]
+        ciphertext = iv_ciphertext_mac[self.block_size:-self.mac_size]
+        mac = iv_ciphertext_mac[-self.mac_size:]
         (cipher_key, mac_key) = derive_keys(self.key)
         expected_mac = hmac_sha1(mac_key, iv + ciphertext)
         if mac != expected_mac:

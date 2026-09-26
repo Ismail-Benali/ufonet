@@ -28,9 +28,15 @@ class Updater(object):
             print("\nAlso you can try this other mirror:\n")
             print("$ git clone %s" % GIT_REPOSITORY2 + "\n")
         else:
-            checkout = execute("git checkout . && git pull", shell=True, stdout=PIPE, stderr=PIPE).communicate()[0]
-            print("[Info] [GitHub] Reply:\n\n"+checkout.decode('utf-8'))
-            if not b"Already up-to-date" in checkout:
+            # Stash local changes before pulling to avoid destroying user modifications
+            stash = execute("git stash push -m 'ufonet user modifications'", shell=True, stdout=PIPE, stderr=PIPE).communicate()[0]
+            # Pull updates
+            pull = execute("git pull", shell=True, stdout=PIPE, stderr=PIPE).communicate()[0]
+            # Try to re-apply stashed changes
+            pop_stash = execute("git stash pop", shell=True, stdout=PIPE, stderr=PIPE).communicate()[0]
+            combined = (stash + pull + pop_stash).decode('utf-8')
+            print("[Info] [GitHub] Reply:\n\n"+combined)
+            if not b"Already up-to-date" in pull and b"Confilct" not in combined:
                 print("[Info] [AI] Congratulations!! UFONet has been updated... ;-)\n")
             else:
                 print("[Info] [AI] Your UFONet doesn't need to be updated... ;-)\n")
