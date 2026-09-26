@@ -12,9 +12,6 @@ Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 import secrets
 import ipaddress
 
-_RESERVED_FIRST_OCTETS = frozenset({0, 10, 127, 169, 172, 192})
-_MAX_OCTET = 256
-
 
 class RandomIP(object):
     """
@@ -32,13 +29,11 @@ class RandomIP(object):
             str: A random valid public IPv4 address string.
         """
         while True:
-            first = secrets.randbelow(_MAX_OCTET - 1) + 1  # 1..255
-            if first in _RESERVED_FIRST_OCTETS:
-                continue
+            first = secrets.randbelow(255) + 1  # 1..255
 
-            second = secrets.randbelow(_MAX_OCTET)  # 0..255
-            third = secrets.randbelow(_MAX_OCTET)  # 0..255
-            fourth = secrets.randbelow(_MAX_OCTET)  # 0..255
+            second = secrets.randbelow(256)  # 0..255
+            third = secrets.randbelow(256)  # 0..255
+            fourth = secrets.randbelow(256)  # 0..255
 
             # Validate full IP against reserved ranges
             try:

